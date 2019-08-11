@@ -1,47 +1,35 @@
 var AWS = require("aws-sdk"),
-    s3 = new AWS.S3(),
-    ses = new AWS.SES();
+    s3 = new AWS.S3();
 
-exports.handler = async (event, context, callback) => {
-    // TODO implement
-    var response = {
-        statusCode: 200,
-        body: JSON.stringify('Hello from Lambda!')
-    };
-    
-    var bucketParams = {
-        Bucket : "ec2poc"
-    };
-    
-    var sum = 0;
-    
-    s3.listObjectsV2(bucketParams, function(err, data){
+exports.handler = function (event, context, callback) {
+    var sum = 0, bucketName;
+
+    bucketName = event.Records[0].s3.bucket.name;
+
+    s3.listObjectsV2({
+        Bucket: bucketName
+    }, function (err, data) {
         if (err) {
-    console.log("Error", err);
+            console.log("Error", err);
         } else {
-        data.Contents.forEach(function(object){
-            sum += object.Size;
-            console.log("OBJECT " + object.Size);
-        });
-        console.log("SUM " + sum);
-        
-        var params = {
-            Message: 'TEXT_MESSAGE', /* required */
-            TopicArn: 'arn:aws:sns:us-east-1:273610051498:NotifyMe',
-            };
-        var publishTextPromise = new AWS.SNS().publish(params).promise();
-        
-        publishTextPromise.then(
-          function(data) {
-            console.log("SUCCESS SEND TO ARN: MessageID is " + data.MessageId);
-          }).catch(
-            function(err) {
-            console.error(err, err.stack);
-          });
+            sum += counting(data, sum);
+
+            new AWS.SNS().publish({
+                Message: "Bucket name = " + bucketName + " and size used = " + sum + " bytes",
+                TopicArn: "arn:aws:sns:us-east-1:273610051498:NotifyMe",
+            }).promise()
+                .then(function (data) {
+                    console.log("SUCCESS SEND TO ARN: MessageID is " + data.MessageId);
+                }).catch(function (err) {
+                console.error(err, err.stack);
+            });
         }
     });
-    
-    
-    return response;
 };
 
+var counting = function (data, sum) {
+    data.Contents.forEach(function (object) {
+        sum += object.Size;
+    });
+    return sum;
+};
