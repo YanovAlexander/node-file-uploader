@@ -1,0 +1,75 @@
+Resources:
+  Ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref RootInstanceProfile
+      ImageId: ami-0b898040803850657
+      Tags:
+        - Key: 'Name'
+          Value: 'EC2 POC'
+      SecurityGroups:
+        - !Ref EC2SSHSecurityGroup
+        - !Ref EC2HTTPSSecurityGroup
+      UserData:
+        !Base64 |
+        #!/bin/bash
+        yum update -y
+        yum install -y gcc-c++ make
+        curl -sL https://rpm.nodesource.com/setup_10.x | sudo -E bash -
+        yum install -y nodejs
+        yum install -y git
+        mkdir /nodejs
+        cd /nodejs
+        git clone https://github.com/YanovAlexander/node-file-uploader.git
+        cd node-file-uploader
+        npm install
+        npm start
+  RootInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref S3WritableRole
+  S3WritableRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+  RolePolicies:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - Ec2Instance
+    Properties:
+      PolicyName: Ec2InstancePolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: 's3:*'
+            Resource: '*'
+      Roles:
+        - !Ref S3WritableRole
+  EC2SSHSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable SSH via port 22
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+  EC2HTTPSSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable port 80
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
