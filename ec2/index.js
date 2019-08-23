@@ -22,7 +22,6 @@ app.post('/upload', function (req, res) {
 		Body: file.data
 	};
 
-	
 	s3.upload(params, function(s3Err, data) {
 		if (s3Err) throw s3Err;
 		console.log(`File uploaded successfully at ${data.Location}`)
